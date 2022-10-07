@@ -1,10 +1,10 @@
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    poetry2nix = {
-      url = "github:nix-community/poetry2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # poetry2nix = {
+    #   url = "github:nix-community/poetry2nix";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
   };
 
   # dev
@@ -29,7 +29,7 @@
           inherit system;
           overlays = with inputs; [
             devshell.overlay
-            poetry2nix.overlay
+            # poetry2nix.overlay
           ];
         };
       in {
@@ -37,9 +37,15 @@
           packages = with pkgs; [
             alejandra
             treefmt
-            poetry
             taplo-cli
-            gcc-unwrapped
+            black
+            maven
+            (python310.withPackages (pp:
+              with pp; [
+                ujson
+                jinja2
+              ]))
+            # gcc-unwrapped
           ];
           commands = [
             {

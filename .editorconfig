@@ -14,3 +14,7 @@ trim_trailing_whitespace = false
 [*.{yml,yaml}]
 indent_style = space
 indent_size = 2
+
+[*.{py,pyi}]
+indent_style = tab
+indent_size = 4

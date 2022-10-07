@@ -1,3 +1,4 @@
+.DS_Store
 
 tasks/*
 !tasks/tNum.sta
@@ -8,3 +9,4 @@ configExample.md
 .direnv
 result
 result-man
+result-lib
