@@ -1,35 +1,36 @@
 import os, ujson, sys
 from typing import Tuple
 
-class DetectionTaskManagement():
+
+class DetectionTaskManagement:
     def __init__(self):
         self.__taskNumber = self.__getTaskNumber()
         self.taskFolder = ""
 
     def __getTaskNumber(self):
         try:
-            tStaFile = __file__[:-34]+'tasks/tNum.sta'
-            staFile = open(tStaFile,'r')
-        except FileNotFoundError :
-            print('err: tNum.sta not found')
+            tStaFile = __file__[:-34] + "tasks/tNum.sta"
+            staFile = open(tStaFile, "r")
+        except FileNotFoundError:
+            print("err: tNum.sta not found")
             return None
         else:
-            sta = int(staFile.readlines()[0].replace('\n',''))
+            sta = int(staFile.readlines()[0].replace("\n", ""))
             staFile.close()
             return sta
 
     def __addTaskNumber(self):
         # be called only when createTask
         try:
-            staFile = open('tasks/tNum.sta','w')
+            staFile = open("tasks/tNum.sta", "w")
         except FileNotFoundError:
-            print('err: tNum.sta not found')
+            print("err: tNum.sta not found")
             return False
         else:
             staFile.write(str(self.__taskNumber + 1))
             staFile.close()
             self.__taskNumber += 1
-    
+
     def createTask(self, configObj, inputObj):
         newTaskId = int(self.__getTaskNumber()) + 1
         if newTaskId == None:
@@ -40,39 +41,46 @@ class DetectionTaskManagement():
         return DetectionTask(newTaskId, configObj, inputObj, path)
 
     def __initTaskFolder(self, newTaskId):
-        path = 'tasks/task' + str(newTaskId)
+        path = "tasks/task" + str(newTaskId)
         try:
             os.mkdir(path)
         except FileExistsError:
             pass
         self.taskFolder = os.path.abspath(path)
-        staFile = open(path+'/d_Num.str','w')
-        staFile.write('0')
+        staFile = open(path + "/d_Num.str", "w")
+        staFile.write("0")
         staFile.close()
         return path
 
     def saveTask(self, taskObj):
-        saveObj = {"taskId":taskObj.taskId, "configObj":taskObj.configObj, "inputObj" : taskObj.inputObj}
+        saveObj = {
+            "taskId": taskObj.taskId,
+            "configObj": taskObj.configObj,
+            "inputObj": taskObj.inputObj,
+        }
         ujsonContent = ujson.dumps(saveObj)
-        
-        savePath = self.taskFolder + '/taskData.obj'
-        file = open(savePath,'w')
+
+        savePath = self.taskFolder + "/taskData.obj"
+        file = open(savePath, "w")
         file.write(ujsonContent)
         file.close()
 
     def loadTask(self, taskId):
-        loadPathFolder = os.path.dirname(__file__)[:-7] + 'tasks/task' + str(taskId)
+        loadPathFolder = os.path.dirname(__file__)[:-7] + "tasks/task" + str(taskId)
         try:
-            file = open(loadPathFolder + '/taskData.obj','r')
-            data = file.readlines()[0] 
+            file = open(loadPathFolder + "/taskData.obj", "r")
+            data = file.readlines()[0]
             taskObj = ujson.loads(data)
         except FileNotFoundError:
-            print('loading task data wrong')
+            print("loading task data wrong")
             return None
-    
-        return DetectionTask(taskObj['taskId'], taskObj['configObj'], taskObj['inputObj'], loadPathFolder)
 
-class DetectionTask():
+        return DetectionTask(
+            taskObj["taskId"], taskObj["configObj"], taskObj["inputObj"], loadPathFolder
+        )
+
+
+class DetectionTask:
     def __init__(self, taskId, configObj, inputObj, path):
         self.taskId = taskId
         self.configObj = configObj
@@ -92,34 +100,41 @@ class DetectionTask():
             inputObj.saveFileList(self.taskFolderPath)
         except Exception:
             print("DetectionTaskManagemant.py:92 need to be modified  ")
+
     def getTaskId(self):
         return self.taskId
 
     def getConfigObj(self):
         return self.configObj
-    
+
     def getInputObj(self):
         return self.inputObj
 
     def __createKeywordsSet(self):
         try:
-            keywordPath = os.path.dirname(__file__)[:-7] + self.configObj['parser'] + '/' + self.configObj['grammarName'] + '.reserved'
-            file = open(keywordPath,'r')
+            keywordPath = (
+                os.path.dirname(__file__)[:-7]
+                + self.configObj["parser"]
+                + "/"
+                + self.configObj["grammarName"]
+                + ".reserved"
+            )
+            file = open(keywordPath, "r")
         except FileNotFoundError:
-            print('keywords list file not found')
+            print("keywords list file not found")
             return None
-        
+
         kData = file.readlines()
         res = set()
         for i in kData:
-            res.add(i.replace('\n',''))
+            res.add(i.replace("\n", ""))
         return res
-    
+
     def getDetectionNum(self):
         try:
-            numFile = open('tasks/task'+str(self.taskId) + '/d_Num.str')
+            numFile = open("tasks/task" + str(self.taskId) + "/d_Num.str")
         except FileNotFoundError:
-            print('detection number file not found')
+            print("detection number file not found")
             return None
-        
+
         return int(numFile.readlines()[0])

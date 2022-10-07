@@ -3,18 +3,21 @@ import importlib
 import multiprocessing
 from queue import Empty
 import types
+
 # from antlr4 import *
-import ujson,sys, os
+import ujson, sys, os
 import re
 import time
 import pickle
 import traceback
 import globalTokenFrequency
+
 # first, write the program of token bag generation for one input file, and then scale it by multiprocessing.
 
 sys.setrecursionlimit(10000)
 
-class TokenBagGenerationController():
+
+class TokenBagGenerationController:
     def __init__(self, taskObj):
         # sys.path.append(os.path.dirname(__file__)[:-7]+taskObj.configObj['parser'])
         # sys.path.append(sys.path[0][0:-16] + '/' + taskObj.configObj['parser'])
@@ -23,7 +26,9 @@ class TokenBagGenerationController():
         # self.parserModule = getattr(importlib.import_module(taskObj.configObj['grammarName'] + 'Parser'), taskObj.configObj['grammarName'] + 'Parser')
 
         self.taskObj = taskObj
-        self.minTokensForBagGeneration = int(taskObj.configObj['minTokensForBagGeneration'])
+        self.minTokensForBagGeneration = int(
+            taskObj.configObj["minTokensForBagGeneration"]
+        )
         # self.minLinesForBagGeneration = int(taskObj.configObj['minLinesForBagGeneration'])
 
     def nodeNumCalcu(self, bagQueue, taskNum):
@@ -67,14 +72,14 @@ class TokenBagGenerationController():
         print(str(sum(arr2)))
         print(str(sum(arr3)))
         return gtpObj
-    
+
     # def __gtpCalculation(self, tokenArr, mutex, tokensDict, idsArray):
     #     mutex.acquire()
     #     addItemOutside = globalTokenFrequency.GlobalTokenfrequency().addItemOutside
     #     for token in tokenArr:
     #         addItemOutside(token, tokensDict, idsArray)
     #     mutex.release()
-    
+
     # def run(self, fileId, bagCollectionArr, timeArr, errMsgArr, gtpQueue):
     def run(self, fileId, bagCollectionArr, errMsgArr, gtpQueue, bagNumQueue):
         try:
@@ -85,22 +90,22 @@ class TokenBagGenerationController():
             # activity: save the tokens from level 0 to the GTP
             # this function will be runned concurrently
             # step: AST generation -> index generation(leafNodeArr allTreeNodeArr) ->token num generation and set token type -> analysis tree generation-> bag generation
-            
+
             filePath = self.taskObj.inputObj[fileId]
             # print("Token bag generation for file(" + filePath + ') is being excuted in process ' + str(os.getpid()))
 
             # antlr's part
-            inputStream = FileStream(filePath, encoding='UTF_8', errors='ignore')
+            inputStream = FileStream(filePath, encoding="UTF_8", errors="ignore")
             lexer = self.lexerModule(inputStream)
             stream = CommonTokenStream(lexer)
             parser = self.parserModule(stream)
-            astTree = getattr(parser, self.taskObj.configObj['startSymble'])()
-            
+            astTree = getattr(parser, self.taskObj.configObj["startSymble"])()
+
             # middleTime = time.time()
 
             # index generation
-            leafNodeArr = [None] * len(stream.tokens) # index to leaf nodes in the tree
-            allTreeNodeArr = [] # every tree node ('treeNodeIndex')
+            leafNodeArr = [None] * len(stream.tokens)  # index to leaf nodes in the tree
+            allTreeNodeArr = []  # every tree node ('treeNodeIndex')
             self.indexGeneration(astTree, leafNodeArr, allTreeNodeArr)
 
             # set tokenType (whether keywords)
@@ -114,17 +119,17 @@ class TokenBagGenerationController():
                 if leafNodeArr[i].tokenType != 0:
                     tokenText = leafNodeArr[i].symbol.text
                     tokenArr = self.__splitStringLiterial(tokenText)
-                    setattr (leafNodeArr[i].symbol, 'tokenArr', tokenArr)
+                    setattr(leafNodeArr[i].symbol, "tokenArr", tokenArr)
                     allToken = allToken + leafNodeArr[i].symbol.tokenArr
 
-            # calculate each sub tree's token number & 
+            # calculate each sub tree's token number &
             # set the type of tokens that each tree contains
             for i in leafNodeArr:
                 if i != None:
                     self.__setTypeAndNumber(i)
 
             # analysis tree generation
-            aTree  = self.__analysisTreeGeneration(astTree, fileId, leafNodeArr)
+            aTree = self.__analysisTreeGeneration(astTree, fileId, leafNodeArr)
 
             # tokenBag query
             bagNodeArray = aTree.tokenBagQuery()
@@ -134,10 +139,16 @@ class TokenBagGenerationController():
             for bagNode in bagNodeArray:
                 bag = self.createBag(bagNode, fileId, allTreeNodeArr, leafNodeArr)
                 if bag != None:
-                    bagCollection.append( bag )
+                    bagCollection.append(bag)
 
             gtpQueue.put_nowait(allToken)
-            bagNumQueue.put_nowait([len(allTreeNodeArr)-len(leafNodeArr), aTree.nonLeafNodeCal(), len(bagNodeArray)])
+            bagNumQueue.put_nowait(
+                [
+                    len(allTreeNodeArr) - len(leafNodeArr),
+                    aTree.nonLeafNodeCal(),
+                    len(bagNodeArray),
+                ]
+            )
             # endtime = time.time()
             bagCollectionArr[fileId] = bagCollection
             # timeArr[fileId] = [round(middleTime - startTime , 2)   , round( endtime - middleTime , 2)   ]
@@ -145,19 +156,19 @@ class TokenBagGenerationController():
             # print("The process " + str(os.getpid()) + ' is closed')
 
         except:
-            print('err in file:' + filePath + '\n')
+            print("err in file:" + filePath + "\n")
             error_type, error_value, error_trace = sys.exc_info()
-            errContent = '---------error:---------\n'
-            errContent += 'file:' + filePath + '\n'
-            errContent += str(error_type) + '\n'
-            errContent += str(error_value) + '\n'
-            for info in traceback.extract_tb(error_trace):  
-                errContent += str(info) + '\n'
-            errContent += '------------------\n'
+            errContent = "---------error:---------\n"
+            errContent += "file:" + filePath + "\n"
+            errContent += str(error_type) + "\n"
+            errContent += str(error_value) + "\n"
+            for info in traceback.extract_tb(error_trace):
+                errContent += str(info) + "\n"
+            errContent += "------------------\n"
             errMsgArr.append(errContent)
             print(errContent)
-            bagCollectionArr[fileId] = None    
-            gtpQueue.put_nowait([])      
+            bagCollectionArr[fileId] = None
+            gtpQueue.put_nowait([])
 
     def bagGeneration(self):
         fileNum = len(self.taskObj.inputObj)
@@ -171,53 +182,64 @@ class TokenBagGenerationController():
         # timeArr = multiprocessing.Manager().list()
         # for i in range(fileNum):
         #     timeArr.append(None)
-    
+
         errMsgArr = multiprocessing.Manager().list()
 
         m = multiprocessing.Manager()
         gtpQueue = m.Queue()
 
         bagNumQueue = m.Queue()
-        # using a process pool to generate token bags 
-        
-        pool = multiprocessing.Pool(multiprocessing.cpu_count()) # multiprocessing.cpu_count() - 1
-        #pool = multiprocessing.Pool(2)
+        # using a process pool to generate token bags
+
+        pool = multiprocessing.Pool(
+            multiprocessing.cpu_count()
+        )  # multiprocessing.cpu_count() - 1
+        # pool = multiprocessing.Pool(2)
 
         for i in range(fileNum):
             # pool.apply_async(self.run, args=(i, bagCollectionArr, timeArr, errMsgArr, gtpQueue,))
-            pool.apply_async(self.run, args=(i, bagCollectionArr, errMsgArr, gtpQueue, bagNumQueue, ))
+            pool.apply_async(
+                self.run,
+                args=(
+                    i,
+                    bagCollectionArr,
+                    errMsgArr,
+                    gtpQueue,
+                    bagNumQueue,
+                ),
+            )
         pool.close()
         pool.join()
-        
+
         # test code
         # for i in range(fileNum):
-            # self.run(i, bagCollectionArr, errMsgArr, gtpQueue)
+        # self.run(i, bagCollectionArr, errMsgArr, gtpQueue)
 
-
-        self.gtpCalcu(gtpQueue, fileNum, gtpObj,bagNumQueue)
+        self.gtpCalcu(gtpQueue, fileNum, gtpObj, bagNumQueue)
 
         for err in errMsgArr:
             sys.stderr.write(err)
-            
+
         return (bagCollectionArr, gtpObj)
-      # return (bagCollectionArr, gtpObj, timeArr)
-    
+
+    # return (bagCollectionArr, gtpObj, timeArr)
+
     def __splitStringLiterial(self, string):
-        resArr = re.split(r'\W+', string)
-        if resArr[0] == '':
+        resArr = re.split(r"\W+", string)
+        if resArr[0] == "":
             del resArr[0]
-        if resArr[-1] == '':
+        if resArr[-1] == "":
             del resArr[-1]
         return resArr
 
     def __analysisTreeGeneration(self, astTree, fileId, leafNodeArr):
         analysisTree = AnalysisTree(astTree, fileId).setDepth(0)
-        
+
         nodeArr = analysisTree.nodeArr
         nodeNum = 0
 
-        stackA = [] # stack for astTree
-        stackB = [] # stack for analysisTree
+        stackA = []  # stack for astTree
+        stackB = []  # stack for analysisTree
         stackB_fordepth = [0]
         stackA.append(astTree)
         stackB.append(analysisTree)
@@ -225,10 +247,10 @@ class TokenBagGenerationController():
         # setattr(analysisTree, 'statementThreshold', self.minTokensForBagGeneration)
 
         while len(stackA) != 0:
-            currentA = stackA[-1] # cursor for astTree
-            currentB = stackB[-1] # cursor for analysisTree
+            currentA = stackA[-1]  # cursor for astTree
+            currentB = stackB[-1]  # cursor for analysisTree
             currentDepth = stackB_fordepth[-1]
-            
+
             currentB.nodeIndex = nodeNum
             nodeArr.append(currentB)
             nodeNum += 1
@@ -238,28 +260,32 @@ class TokenBagGenerationController():
             try:
                 while mergeTarget.tokenNum == mergeTarget.children[0].tokenNum:
                     mergeTarget = mergeTarget.children[0]
-            except AttributeError: # 'TerminalNodeImpl' object does not have attribute children
+            except AttributeError:  # 'TerminalNodeImpl' object does not have attribute children
                 pass
-            
+
             stackA.pop()
             stackB.pop()
             stackB_fordepth.pop()
 
-            if not hasattr(mergeTarget, 'tokenNum'):
+            if not hasattr(mergeTarget, "tokenNum"):
                 pass
             # elif mergeTarget.tokenNum < self.statementThreshold:
             #     pass
-            elif self.__tokenSizeValidation(mergeTarget, leafNodeArr): # invalid returns true
+            elif self.__tokenSizeValidation(
+                mergeTarget, leafNodeArr
+            ):  # invalid returns true
                 pass
-            elif self.__lineSizeValidation(mergeTarget): # less than 6 returns true
-                pass  
-            elif not hasattr(mergeTarget, 'children'):
+            elif self.__lineSizeValidation(mergeTarget):  # less than 6 returns true
+                pass
+            elif not hasattr(mergeTarget, "children"):
                 pass
             else:
                 i = len(mergeTarget.children) - 1
-                while i>= 0:
-                    newAnalysisTreeNode = AnalysisTree(mergeTarget.children[i], fileId).setDepth(currentDepth + 1)
-                    currentB.children.insert(0,newAnalysisTreeNode)
+                while i >= 0:
+                    newAnalysisTreeNode = AnalysisTree(
+                        mergeTarget.children[i], fileId
+                    ).setDepth(currentDepth + 1)
+                    currentB.children.insert(0, newAnalysisTreeNode)
                     newAnalysisTreeNode.parent = currentB
                     stackA.append(mergeTarget.children[i])
                     stackB.append(newAnalysisTreeNode)
@@ -272,26 +298,30 @@ class TokenBagGenerationController():
             symbolNum = 0
             left = treeNode.start.tokenIndex
             right = treeNode.stop.tokenIndex + 1
-            for node in leafNodeArr[left: right]:
+            for node in leafNodeArr[left:right]:
                 if node != None:
                     symbolNum += 1
-            setattr(treeNode, 'symbolNum', symbolNum)
+            setattr(treeNode, "symbolNum", symbolNum)
         except AttributeError:
-            setattr(treeNode, 'symbolNum', 1)
+            setattr(treeNode, "symbolNum", 1)
 
     def __tokenSizeValidation(self, targetNode, leafNodeArr):
         # if not hasattr(targetNode, 'symbolNum'):
         #     self.__setSymbolNum(targetNode, leafNodeArr)
-            
-        return  targetNode.tokenNum < self.minTokensForBagGeneration
 
-    def __lineSizeValidation(self, targetNode): # return true if unvalid
+        return targetNode.tokenNum < self.minTokensForBagGeneration
+
+    def __lineSizeValidation(self, targetNode):  # return true if unvalid
         try:
-            if int(targetNode.stop.line) - int(targetNode.start.line) + 1 < self.minLinesForBagGeneration: 
+            if (
+                int(targetNode.stop.line) - int(targetNode.start.line) + 1
+                < self.minLinesForBagGeneration
+            ):
                 return True
             return False
         except AttributeError:
             return True
+
     def treeTraverse(self, function, startNode, variableArr):
         stack = []
         stack.append(startNode)
@@ -300,8 +330,10 @@ class TokenBagGenerationController():
             function(current, variableArr)
             stack.pop()
             if current == None:
-                print('sad')
-            if hasattr(current, 'children'): # 'TerminalNodeImpl' object has no attribute 'children'
+                print("sad")
+            if hasattr(
+                current, "children"
+            ):  # 'TerminalNodeImpl' object has no attribute 'children'
                 if current.children != None:
                     n = len(current.children) - 1
                     while n >= 0:
@@ -309,32 +341,32 @@ class TokenBagGenerationController():
                         n = n - 1
             else:
                 continue
-    
+
     def __setTypeAndNumber(self, node):
         current = node
         previousTokenType = current.tokenType
 
         try:
             tokenNum = len(node.symbol.tokenArr)
-        except :
+        except:
             tokenNum = 0
 
         while current:
             # tokenNum
-            if hasattr(current, 'tokenNum'):
+            if hasattr(current, "tokenNum"):
                 current.tokenNum += tokenNum
             else:
-                setattr(current, 'tokenNum', tokenNum)
+                setattr(current, "tokenNum", tokenNum)
 
             # tokenType
             try:
                 current.tokenType = current.tokenType | previousTokenType
             except AttributeError:
-                setattr(current, 'tokenType', previousTokenType)
+                setattr(current, "tokenType", previousTokenType)
 
             previousTokenType = current.tokenType
             current = current.parentCtx
-      
+
     def indexGeneration(self, astTree, leafNodeArr, allTreeNodeArr):
         self.treeTraverse(self.__setIndex, astTree, [leafNodeArr, allTreeNodeArr])
 
@@ -344,14 +376,16 @@ class TokenBagGenerationController():
         allTreeNodeArr = variableArr[1]
         if self.__ifToken(node):
             leafNodeArr[node.symbol.tokenIndex] = node
-        
+
         allTreeNodeArr.append(node)
-        setattr(node, 'treeNodeIndex',  len(allTreeNodeArr) - 1)
+        setattr(node, "treeNodeIndex", len(allTreeNodeArr) - 1)
 
     def __ifToken(self, node):
-        return hasattr(node, 'symbol') and hasattr(node.symbol, 'tokenIndex')
+        return hasattr(node, "symbol") and hasattr(node.symbol, "tokenIndex")
 
-    def __setTokenType(self, leafNodeArr): # 0: None 1: identifier 2: keywords 3: literial
+    def __setTokenType(
+        self, leafNodeArr
+    ):  # 0: None 1: identifier 2: keywords 3: literial
         for i in leafNodeArr:
             # 需要调查为什么会有空结点出现
             # 追记： 空结点为语句中的空格等无实体token
@@ -361,30 +395,29 @@ class TokenBagGenerationController():
             tokenText = i.symbol.text
             sepaChect = self.__ifSeparator(tokenText)
             if sepaChect == 1:
-                setattr(i,'tokenType',0)  #other
+                setattr(i, "tokenType", 0)  # other
             elif sepaChect == 2:
-                setattr(i,'tokenType',3)  # literial
+                setattr(i, "tokenType", 3)  # literial
             else:
                 if {tokenText}.issubset(self.taskObj.keywordsSet):
-                    setattr(i,'tokenType',2)  # keywords
-                elif re.match(r'^[0-9]*$', tokenText) != None:
-                    setattr(i,'tokenType', 3) # number literial
+                    setattr(i, "tokenType", 2)  # keywords
+                elif re.match(r"^[0-9]*$", tokenText) != None:
+                    setattr(i, "tokenType", 3)  # number literial
                 else:
-                    setattr(i,'tokenType',1)  # identifier
+                    setattr(i, "tokenType", 1)  # identifier
 
     def __ifSeparator(self, str):
-            # using regular expression to check whether the input string is a separator:  if it contains charactors or numbers, it isn't a separator
-        if re.match(r'\W', str) == None: 
-            return 3 # Identifier or Keywords
-        elif re.match(r'\s+$', str) != None:
-            return 1 # indentations
+        # using regular expression to check whether the input string is a separator:  if it contains charactors or numbers, it isn't a separator
+        if re.match(r"\W", str) == None:
+            return 3  # Identifier or Keywords
+        elif re.match(r"\s+$", str) != None:
+            return 1  # indentations
         else:
-            LiterialPattern = r'\W+[a-zA-Z0-9 ]+\W+'
-            if re.match(LiterialPattern,str) != None:
-                return 2 #  String Lieterial
+            LiterialPattern = r"\W+[a-zA-Z0-9 ]+\W+"
+            if re.match(LiterialPattern, str) != None:
+                return 2  #  String Lieterial
             else:
-                return 1       
-
+                return 1
 
     def getTokens(self, treeNode):
         self.treeTraverse()
@@ -393,8 +426,8 @@ class TokenBagGenerationController():
         bag = TokenBag(fileId, bagNode.granularity, bagNode.bagId, bagNode.bagNodeIndex)
 
         tmp = None
-        start = None 
-        end = None 
+        start = None
+        end = None
         i = 0
         while i < len(bagNode.nodes):
             try:
@@ -412,8 +445,8 @@ class TokenBagGenerationController():
                 break
             except AttributeError:
                 i = i - 1
-            
-        bag.setPosition(start.start, end.stop) # can not find end ???
+
+        bag.setPosition(start.start, end.stop)  # can not find end ???
 
         for i in bagNode.nodes:
             try:
@@ -422,7 +455,7 @@ class TokenBagGenerationController():
                 startIndex = targetTreeNode.start.tokenIndex
                 endIndex = targetTreeNode.stop.tokenIndex
 
-                for i in leafNodeArr[startIndex: endIndex+1]:
+                for i in leafNodeArr[startIndex : endIndex + 1]:
                     if i == None:
                         continue
 
@@ -435,7 +468,11 @@ class TokenBagGenerationController():
             except AttributeError:
                 continue
 
-        setattr(bag, 'symbolNum', self.__getSymbolNum(allTreeNodeArr[bagNode.treeNodeIndex], leafNodeArr))
+        setattr(
+            bag,
+            "symbolNum",
+            self.__getSymbolNum(allTreeNodeArr[bagNode.treeNodeIndex], leafNodeArr),
+        )
 
         return bag
 
@@ -445,46 +482,60 @@ class TokenBagGenerationController():
         except AttributeError:
             self.__setSymbolNum(treeNode, leafNodeArr)
             return treeNode.symbolNum
-        
 
     def printBags(self, collectionArr, taskId):
-        filePath = 'tasks/task'+str(self.taskObj.taskId)+'/bagsRepo.file'
-        file = open(filePath, 'w')
+        filePath = "tasks/task" + str(self.taskObj.taskId) + "/bagsRepo.file"
+        file = open(filePath, "w")
         for i in collectionArr:
             if i == None:
                 continue
             for j in i:
-                file.write('fileId: ' + str(j.fileId) + ' lines:' + str(j.startLine) + '-' + str(j.endLine) + '\n')
-                file.write(j.toString() + '\n')
+                file.write(
+                    "fileId: "
+                    + str(j.fileId)
+                    + " lines:"
+                    + str(j.startLine)
+                    + "-"
+                    + str(j.endLine)
+                    + "\n"
+                )
+                file.write(j.toString() + "\n")
         file.close()
 
     def saveBags(self, bagCollectionArr):
         arr = []
         for i in range(len(bagCollectionArr)):
             arr.append(bagCollectionArr[i])
-        savePath = 'tasks/task'+str(self.taskObj.taskId)+'/bags.file'
-        with open(savePath, 'wb') as f:
+        savePath = "tasks/task" + str(self.taskObj.taskId) + "/bags.file"
+        with open(savePath, "wb") as f:
             pickle.dump(arr, f)
 
     def saveTimearr(self, timeArr):
-        savePath = 'tasks/task'+str(self.taskObj.taskId)+'/time.file'
-        file = open(savePath, 'w')
+        savePath = "tasks/task" + str(self.taskObj.taskId) + "/time.file"
+        file = open(savePath, "w")
         for i in range(len(timeArr)):
             try:
-                file.write(str(i) + ' ' + str(timeArr[i][0]) + ' ' + str(timeArr[i][1]) + '\n')
+                file.write(
+                    str(i) + " " + str(timeArr[i][0]) + " " + str(timeArr[i][1]) + "\n"
+                )
             except:
                 pass
         file.close()
-    
+
     def loadBags(self):
-        filePath = os.path.dirname(__file__)[:-7] + 'tasks/task' + str(self.taskObj.taskId) + '/bags.file'
+        filePath = (
+            os.path.dirname(__file__)[:-7]
+            + "tasks/task"
+            + str(self.taskObj.taskId)
+            + "/bags.file"
+        )
         print(filePath)
         bags = None
         try:
-            with open(filePath, 'rb') as f:
+            with open(filePath, "rb") as f:
                 bags = pickle.load(f)
         except FileNotFoundError:
-            print('err: bags.file not exist')
+            print("err: bags.file not exist")
         return bags
 
     # def saveBagTreeArr(self, bagTreeArr):
@@ -504,13 +555,13 @@ class TokenBagGenerationController():
     #     except FileNotFoundError:
     #         print('err: bagTree.file not exist')
     #     return bagTreeData
-    
+
     def loadBagsFromFile(self):
         filePath = self.taskObj.taskFolderPath + "/tokenBags"
         bags = []
 
         try:
-            with open(filePath,"r") as f:
+            with open(filePath, "r") as f:
                 for dataLine in f.readlines():
                     tBag = self.__createTokenBagFromStr(dataLine[:-1])
                     try:
@@ -520,7 +571,7 @@ class TokenBagGenerationController():
                                 bags.append(0)
                         if bags[tBag.projectId] == 0:
                             bags[tBag.projectId] = [0]
-                        
+
                         if tBag.fileId > len(bags[tBag.projectId]) - 1:
                             while tBag.fileId > len(bags[tBag.projectId]) - 1:
                                 bags[tBag.projectId].append(0)
@@ -528,7 +579,7 @@ class TokenBagGenerationController():
                             bags[tBag.projectId][tBag.fileId] = [tBag]
                         else:
                             bags[tBag.projectId][tBag.fileId].append(tBag)
-                        
+
                         # if bags[tBag.fileId] == 0:
                         #     bags[tBag.fileId] = [tBag]
                         # else:
@@ -536,18 +587,17 @@ class TokenBagGenerationController():
                     except Exception as e:
                         print(e)
 
-
         except FileNotFoundError:
             print("TokenBag file not found.")
             return None
-        
+
         return bags
-    
-    def loadBagsFromFile_old(self): # before inter-project detection added
+
+    def loadBagsFromFile_old(self):  # before inter-project detection added
         filePath = self.taskObj.taskFolderPath + "/tokenBags"
         bags = [0] * len(self.taskObj.inputObj)
         try:
-            with open(filePath,"r") as f:
+            with open(filePath, "r") as f:
                 for dataLine in f.readlines():
                     tBag = self.__createTokenBagFromStr(dataLine[:-1])
                     try:
@@ -561,18 +611,18 @@ class TokenBagGenerationController():
         except FileNotFoundError:
             print("TokenBag file not found.")
             return None
-        
+
         return bags
 
     def __createTokenBagFromStr(self, sourceStr):
         try:
-            SAPARATOR_INFO  = "@ @"
+            SAPARATOR_INFO = "@ @"
             SAPARATOR_TOKEN = "_ _"
-            SAPARATOR_ITEM  = ": :"
+            SAPARATOR_ITEM = ": :"
             array = sourceStr.split(SAPARATOR_INFO)
             positionArr = array[6].split(SAPARATOR_ITEM)
-            tokenArr    = array[7].split(SAPARATOR_TOKEN)
-            res = TokenBag(array[1], array[2], array[3], array[4],array[5],array[0] )
+            tokenArr = array[7].split(SAPARATOR_TOKEN)
+            res = TokenBag(array[1], array[2], array[3], array[4], array[5], array[0])
 
             res.setPositionO(positionArr[0], positionArr[1])
 
@@ -580,7 +630,7 @@ class TokenBagGenerationController():
             for tokenItem in tokenArr:
                 tmp = tokenItem.split(SAPARATOR_ITEM)
                 try:
-                    res.addTokenWithFreq(tmp[0],int(tmp[1]))
+                    res.addTokenWithFreq(tmp[0], int(tmp[1]))
                 except Exception:
                     continue
 
@@ -588,7 +638,8 @@ class TokenBagGenerationController():
         except IndexError:
             pass
 
-class AnalysisTree():
+
+class AnalysisTree:
     def __init__(self, treeNode, fileId):
         self.fileId = fileId
         self.parent = None
@@ -602,8 +653,8 @@ class AnalysisTree():
             self.tokenNum = None
             self.tokenType = None
             self.treeNodeIndex = None
-        self.nodeArr = []     # every node in AnalysisTree
-        self.nodeIndex = None # the index of this node in self.nodeArr
+        self.nodeArr = []  # every node in AnalysisTree
+        self.nodeIndex = None  # the index of this node in self.nodeArr
         self.ifBag = False
         self.avaliable = True
 
@@ -614,14 +665,14 @@ class AnalysisTree():
             current = stack[-1]
             function(current)
             stack.pop()
-            try: # 'TerminalNodeImpl' object has no attribute 'children'
+            try:  # 'TerminalNodeImpl' object has no attribute 'children'
                 n = len(current.children) - 1
                 while n >= 0:
                     stack.append(current.children[n])
                     n = n - 1
             except AttributeError:
                 pass
-    
+
     def nonLeafNodeCal(self):
         startNode = self
         stack = []
@@ -632,7 +683,7 @@ class AnalysisTree():
             if len(current.children) != 0:
                 sum += 1
             stack.pop()
-            try: # 'TerminalNodeImpl' object has no attribute 'children'
+            try:  # 'TerminalNodeImpl' object has no attribute 'children'
                 n = len(current.children) - 1
                 while n >= 0:
                     stack.append(current.children[n])
@@ -640,7 +691,7 @@ class AnalysisTree():
             except AttributeError:
                 pass
         return sum
-    
+
     def setUnavaliable(self, node):
         node.avaliable = False
 
@@ -649,11 +700,11 @@ class AnalysisTree():
         res = []
         stack = []
         stack.append(self)
-        firstTargetDepth = None # for the file split
-        topDepth = None # for relative depth
+        firstTargetDepth = None  # for the file split
+        topDepth = None  # for relative depth
         bagNum = 0
-        sta = 0 # 0: top depth is not set in current subtree 1: ..has been set
-        
+        sta = 0  # 0: top depth is not set in current subtree 1: ..has been set
+
         # add the root node to the result array. ( For file level bag generation)
         bagNode = BagNode(-1, 0, 0, 0)
         bagNode.addTreeNode(0)
@@ -667,22 +718,29 @@ class AnalysisTree():
             if sta == 1 and current.depth == topDepth:
                 sta = 0
                 topDepth = None
-            
+
             if self.__bagNodeValidation(current):
                 if current.ifBag == False:
                     current.ifBag = True
                     if bagNum == 1:
                         firstTargetDepth = current.depth
-                    
+
                     if sta == 0:
                         topDepth = current.depth
-                        bagNode = BagNode(0, bagNum, current.nodeIndex, current.treeNodeIndex)
+                        bagNode = BagNode(
+                            0, bagNum, current.nodeIndex, current.treeNodeIndex
+                        )
                         bagNum += 1
                         bagNode.addTreeNode(current.treeNodeIndex)
                         res.append(bagNode)
                         sta = 1
                     else:
-                        bagNode = BagNode(current.depth - topDepth, bagNum, current.nodeIndex, current.treeNodeIndex)
+                        bagNode = BagNode(
+                            current.depth - topDepth,
+                            bagNum,
+                            current.nodeIndex,
+                            current.treeNodeIndex,
+                        )
                         bagNum += 1
                         bagNode.addTreeNode(current.treeNodeIndex)
                         res.append(bagNode)
@@ -693,7 +751,7 @@ class AnalysisTree():
             while n >= 0:
                 stack.append(current.children[n])
                 n = n - 1
-        
+
         # self.topLevelSplit(res, firstTargetDepth, bagNum)
 
         return res
@@ -721,7 +779,7 @@ class AnalysisTree():
     #                     newBag.addTreeNode(treeNodes.treeNodeIndex)
     #                 res.append(newBag)
     #                 break
-            
+
     #         if targetCursor == splitPoints[splitPointCursor]:
     #             #if abs(targetCursor - startPoint) <= 1:
     #             splitSection = self.__splitSectionFilter(targetCursor, startPoint, targetLevelNodes)
@@ -741,7 +799,6 @@ class AnalysisTree():
     #                 startPoint = targetCursor + 1
     #                 splitPointCursor = splitPointCursor + 1
     #         targetCursor = targetCursor + 1
-    
 
     def __splitSectionFilter(self, targetCursor, startPoint, targetLevelNodes):
         # targetLevelNodes
@@ -753,7 +810,9 @@ class AnalysisTree():
             i = i + 1
         return res
 
-    def __mergeNodes(self, targetsArr, splitPointNode, lr): # lr: l0 r1. r is used only at the last merging
+    def __mergeNodes(
+        self, targetsArr, splitPointNode, lr
+    ):  # lr: l0 r1. r is used only at the last merging
         newNode = AnalysisTree(None, targetsArr[0].fileId)
         newNode.ifBag = True
 
@@ -761,9 +820,9 @@ class AnalysisTree():
         newNode.parent = splitPointParentNode
         for i in range(len(splitPointParentNode.children)):
             if splitPointParentNode.children[i].nodeIndex == splitPointNode.nodeIndex:
-                splitPointParentNode.children.insert(i+lr, newNode)
+                splitPointParentNode.children.insert(i + lr, newNode)
                 break
-        
+
         for target in targetsArr:
             nodesToDelete = []
             targetParent = target.parent
@@ -782,18 +841,18 @@ class AnalysisTree():
 
         return newNode
 
-    def __bagNodeValidation(self, targetNode): # Boolean
-        if not hasattr(targetNode, 'tokenNum') or targetNode.tokenNum == None:
+    def __bagNodeValidation(self, targetNode):  # Boolean
+        if not hasattr(targetNode, "tokenNum") or targetNode.tokenNum == None:
             return False
 
         # if targetNode.tokenNum > sThreshold:
         childs = targetNode.children
         if len(childs) == 0:
             return False
-        
+
         flag = 0
         for i in childs:
-            if not hasattr(i, 'tokenNum') or i.tokenNum == None:
+            if not hasattr(i, "tokenNum") or i.tokenNum == None:
                 continue
             if i.tokenNum <= self.statementThreshold and i.tokenType == 2:
                 flag = flag | 1
@@ -803,45 +862,45 @@ class AnalysisTree():
             return True
         # else:
         #     return False
-    
+
     def setDepth(self, depth):
         self.depth = depth
         return self
 
 
-
-class BagNode():
+class BagNode:
     def __init__(self, granularity, bagId, bagNodeIndex, treeNodeIndex):
-        self.nodes = [] # treeNodeIndex
+        self.nodes = []  # treeNodeIndex
         self.granularity = granularity
         self.bagId = bagId
         self.bagNodeIndex = bagNodeIndex
         self.treeNodeIndex = treeNodeIndex
-    
+
     def addTreeNode(self, treeNodeIndex):
         self.nodes.append(treeNodeIndex)
 
 
+class TokenBag:
+    def __init__(
+        self, fileId, bagId, granularity, keywordsNum, symbolNum, pId, tokenNum=0
+    ):
 
-class TokenBag():
-    def __init__(self, fileId, bagId,granularity,keywordsNum, symbolNum, pId, tokenNum = 0):
-
-        self.tokens       = {}
-        self.fileId       = int(fileId)
-        self.bagId        = int(bagId)
-        self.granularity  = int(granularity)
-        self.startLine    = None
-        self.endLine      = None
-        # self.startColumn  = None 
+        self.tokens = {}
+        self.fileId = int(fileId)
+        self.bagId = int(bagId)
+        self.granularity = int(granularity)
+        self.startLine = None
+        self.endLine = None
+        # self.startColumn  = None
         # self.endColumn    = None
         # self.bagNodeIndex = bagNodeIndex
-        self.tokenNum     = tokenNum
-        self.symbolNum    = int(symbolNum);
+        self.tokenNum = tokenNum
+        self.symbolNum = int(symbolNum)
         # self.num_id       = 0
         # self.num_literial = 0
         self.num_keywords = int(keywordsNum)
-        self.projectId    = int(pId)
-    
+        self.projectId = int(pId)
+
     def addToken(self, token):
         try:
             if token in self.tokens:
@@ -850,7 +909,7 @@ class TokenBag():
                 self.tokens[token] = 1
         except AttributeError:
             return True
-    
+
     def addTokenWithFreq(self, token, freq):
         try:
             if token in self.tokens:
@@ -861,14 +920,14 @@ class TokenBag():
         except AttributeError:
             return
 
-    def setPosition(self,startToken, endToken):
+    def setPosition(self, startToken, endToken):
         self.endLine = endToken.line
         self.startLine = startToken.line
 
         # self.startColumn = startToken.column
         # self.endColumn = endToken.column
 
-        if endToken.text.find('\r\n') != -1:
+        if endToken.text.find("\r\n") != -1:
             self.endLine = self.endLine - 1
 
         self.lineSize = self.endLine - self.startLine + 1
@@ -880,19 +939,28 @@ class TokenBag():
         # self.lineSize = self.endLine - self.startLine + 1
 
     def printBag(self):
-        print('bagId:' + str(self.bagId) + ' fileId:' + str(self.fileId) + ' position: ' + str(self.startLine) + '-' + str(self.endLine))
-        tokenString = "" 
+        print(
+            "bagId:"
+            + str(self.bagId)
+            + " fileId:"
+            + str(self.fileId)
+            + " position: "
+            + str(self.startLine)
+            + "-"
+            + str(self.endLine)
+        )
+        tokenString = ""
         for i in self.tokens:
-            tokenString = tokenString + i + ':' + str(self.tokens[i]) + '|_|'
+            tokenString = tokenString + i + ":" + str(self.tokens[i]) + "|_|"
         print(tokenString)
-        print('------')
+        print("------")
 
     def toString(self):
-        tokenString = "" 
+        tokenString = ""
         for i in self.tokens:
-            tokenString = tokenString + i + ':' + str(self.tokens[i]) + '|_|'
+            tokenString = tokenString + i + ":" + str(self.tokens[i]) + "|_|"
         return tokenString
-    
+
     def setTypeNumByType(self, typeSta):
         if typeSta == 1:
             self.num_id += 1

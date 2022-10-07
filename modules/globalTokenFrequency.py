@@ -1,30 +1,31 @@
-# to process the token frequency in the project and save it 
+# to process the token frequency in the project and save it
 import os
 import ujson, pickle
 
-class GlobalTokenfrequency():
+
+class GlobalTokenfrequency:
     def __init__(self, tokensDict={}, idsArray=[]):
-        self.__tokens = dict(tokensDict) # [frequency, id]
+        self.__tokens = dict(tokensDict)  # [frequency, id]
         self.__id = list(idsArray)
-            
+
     def searchFrequencyById(self, tokenId):
         try:
             return self.__tokens[self.__id[tokenId]][0]
         except:
-            print('err: the tokenId ' + str(tokenId) + ' not found in GTP')
-    
+            print("err: the tokenId " + str(tokenId) + " not found in GTP")
+
     def searchIdByToken(self, tokenContent):
         try:
             return self.__tokens[tokenContent][1]
         except KeyError:
-            print('err: the token ' + tokenContent + ' not found in GTP.')
+            print("err: the token " + tokenContent + " not found in GTP.")
             return None
 
     def searchFrequencyByToken(self, tokenContent):
         try:
             return self.__tokens[tokenContent][0]
         except KeyError:
-            print('err: the token ' + tokenContent + ' not found in GTP.')
+            print("err: the token " + tokenContent + " not found in GTP.")
             return None
 
     def addItem(self, token):
@@ -34,11 +35,11 @@ class GlobalTokenfrequency():
             newId = len(self.__id)
             self.__id.append(token)
             self.__tokens[token] = [1, newId]
-    
+
     def addItemOutside(self, token, tokensDict, idsArray):
         if token in tokensDict:
             newItem = [tokensDict[token][0] + 1, tokensDict[token][1]]
-            tokensDict[token]= newItem
+            tokensDict[token] = newItem
         else:
             newId = len(idsArray)
             idsArray.append(token)
@@ -54,17 +55,17 @@ class GlobalTokenfrequency():
             self.__tokens[token] = [freq, newId]
 
     def saveGTP(self, taskId):
-        filePath = 'tasks/task' + str(taskId) + '/gtp.file'
-        with open(filePath, 'wb') as f:
+        filePath = "tasks/task" + str(taskId) + "/gtp.file"
+        with open(filePath, "wb") as f:
             pickle.dump(self, f)
-        
+
     def loadGTP(self, taskId):
-        filePath = 'tasks/task' + str(taskId) + '/gtp.file'
+        filePath = "tasks/task" + str(taskId) + "/gtp.file"
         try:
-            with open(filePath, 'rb') as f:
+            with open(filePath, "rb") as f:
                 return pickle.load(f)
         except FileNotFoundError:
-            print('err: gtp.file not found')
+            print("err: gtp.file not found")
 
     def loadGTPFromBagCollectionArr(self, bagCollectionArr):
         res = GlobalTokenfrequency()
@@ -85,13 +86,12 @@ class GlobalTokenfrequency():
         try:
             tmp = None
             tmp2 = None
-            with open(path,"r") as f:
+            with open(path, "r") as f:
                 for tokenItem in f.readlines():
                     tmp = tokenItem.split(SEPARATOR_ITEM)[:-1]
                     for frequecnctItem in tmp:
                         tmp2 = frequecnctItem.split(SEPARATOR_FREQ)
                         res.addItemWithFrequency(tmp2[0], int(tmp2[1]))
-
 
                     # try:
                     #     if len(tmp == 2):
@@ -107,7 +107,7 @@ class GlobalTokenfrequency():
         except FileNotFoundError:
             print("GTP not found")
             return
-        
+
         return res
 
     # def saveGTP(self, taskId):
@@ -129,4 +129,3 @@ class GlobalTokenfrequency():
     #         return None
     #     self.__tokens = gtpData
     #     return self
-
