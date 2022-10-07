@@ -1,0 +1,22 @@
+{
+  "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
+  "customLocalFormatters.formatters": [
+    {
+      "command": "treefmt -q --stdin ${file}",
+      "languages": [
+        "nix",
+        "toml",
+        "python"
+      ]
+    }
+  ],
+  "[toml]": {
+    "editor.defaultFormatter": "jkillian.custom-local-formatters"
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "jkillian.custom-local-formatters"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "jkillian.custom-local-formatters"
+  }
+}

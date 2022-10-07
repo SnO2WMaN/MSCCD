@@ -1,6 +1,10 @@
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    poetry2nix = {
+      url = "github:nix-community/poetry2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # dev
@@ -25,13 +29,17 @@
           inherit system;
           overlays = with inputs; [
             devshell.overlay
+            poetry2nix.overlay
           ];
         };
-      in rec {
+      in {
         devShells.default = pkgs.devshell.mkShell {
           packages = with pkgs; [
             alejandra
             treefmt
+            poetry
+            taplo-cli
+            gcc-unwrapped
           ];
           commands = [
             {
@@ -39,6 +47,9 @@
               category = "formatter";
             }
           ];
+        };
+        devShells.poetry = pkgs.poetry2nix.mkPoetryEnv {
+          projectDir = ./.;
         };
       }
     );
